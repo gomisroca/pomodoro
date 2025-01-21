@@ -1,74 +1,272 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  SafeAreaView,
+  Platform,
+  Vibration,
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialIcons";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function PomodoroTimer() {
+  const [workDuration, setWorkDuration] = useState("25");
+  const [restDuration, setRestDuration] = useState("5");
+  const [rounds, setRounds] = useState("4");
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [isRunning, setIsRunning] = useState(false);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [isRestPeriod, setIsRestPeriod] = useState(false);
 
-export default function HomeScreen() {
+  // Theme colors
+  const colors = {
+    work: {
+      primary: "#22c55e",
+      background: "#dcfce7",
+      text: "#166534",
+    },
+    rest: {
+      primary: "#3b82f6",
+      background: "#dbeafe",
+      text: "#1e40af",
+    },
+  };
+
+  const currentTheme = isRestPeriod ? colors.rest : colors.work;
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRunning && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((time) => time - 1);
+      }, 1000);
+    } else if (timeLeft === 0) {
+      Vibration.vibrate(Platform.OS === "ios" ? [0, 500] : [0, 500, 110, 500]);
+
+      if (isRestPeriod) {
+        // End of rest period
+        if (currentRound < parseInt(rounds)) {
+          // Start next work period
+          setCurrentRound((r) => r + 1);
+          setIsRestPeriod(false);
+          setTimeLeft(parseInt(workDuration) * 60);
+        } else {
+          // End of all rounds
+          resetTimer();
+        }
+      } else {
+        // End of work period, start rest period
+        setIsRestPeriod(true);
+        setTimeLeft(parseInt(restDuration) * 60);
+      }
+    }
+    return () => clearInterval(interval);
+  }, [
+    isRunning,
+    timeLeft,
+    currentRound,
+    rounds,
+    workDuration,
+    restDuration,
+    isRestPeriod,
+  ]);
+
+  const toggleTimer = () => {
+    setIsRunning(!isRunning);
+  };
+
+  const handleDurationChange = (value: string) => {
+    setWorkDuration(value);
+    if (!isRunning && value.length > 0) {
+      setTimeLeft(parseInt(value) * 60);
+      setCurrentRound(1);
+      setIsRestPeriod(false);
+      return;
+    }
+  };
+
+  const resetTimer = () => {
+    setIsRunning(false);
+    setTimeLeft(parseInt(workDuration) * 60);
+    setCurrentRound(1);
+    setIsRestPeriod(false);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: currentTheme.background }]}
+    >
+      <View style={styles.timerCard}>
+        <Text style={[styles.phaseText, { color: currentTheme.text }]}>
+          {isRestPeriod ? "Rest Time" : "Work Time"} - Round {currentRound}/
+          {rounds}
+        </Text>
+
+        <Text style={[styles.timerText, { color: currentTheme.text }]}>
+          {formatTime(timeLeft)}
+        </Text>
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Work Duration (minutes):</Text>
+          <TextInput
+            style={styles.input}
+            value={workDuration}
+            onChangeText={handleDurationChange}
+            keyboardType="numeric"
+            maxLength={2}
+            editable={!isRunning}
+          />
+
+          <Text style={styles.label}>Rest Duration (minutes):</Text>
+          <TextInput
+            style={styles.input}
+            value={restDuration}
+            onChangeText={setRestDuration}
+            keyboardType="numeric"
+            maxLength={2}
+            editable={!isRunning}
+          />
+
+          <Text style={styles.label}>Number of Rounds:</Text>
+          <TextInput
+            style={styles.input}
+            value={rounds}
+            onChangeText={setRounds}
+            keyboardType="numeric"
+            maxLength={2}
+            editable={!isRunning}
+          />
+        </View>
+
+        <View style={styles.progressContainer}>
+          {Array.from({ length: parseInt(rounds) }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.progressDot,
+                {
+                  backgroundColor:
+                    index + 1 < currentRound
+                      ? currentTheme.primary
+                      : index + 1 === currentRound
+                      ? currentTheme.primary
+                      : "#d1d5db",
+                },
+              ]}
+            />
+          ))}
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { backgroundColor: isRunning ? "#ef4444" : currentTheme.primary },
+            ]}
+            onPress={toggleTimer}
+          >
+            <Icon
+              name={isRunning ? "pause" : "play-arrow"}
+              size={24}
+              color="white"
+            />
+            <Text style={styles.buttonText}>
+              {isRunning ? "Pause" : "Start"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.resetButton]}
+            onPress={resetTimer}
+          >
+            <Icon name="refresh" size={24} color="white" />
+            <Text style={styles.buttonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#f3f4f6",
   },
-  stepContainer: {
-    gap: 8,
+  timerCard: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  phaseText: {
+    fontSize: 24,
+    fontWeight: "600",
+    marginBottom: 20,
+    color: "#374151",
+  },
+  timerText: {
+    fontSize: 72,
+    fontWeight: "bold",
+    marginBottom: 40,
+  },
+  inputContainer: {
+    width: "100%",
+    marginBottom: 30,
+  },
+  label: {
+    fontSize: 16,
     marginBottom: 8,
+    color: "#374151",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  input: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "white",
+    marginBottom: 16,
+  },
+  progressContainer: {
+    flexDirection: "row",
+    marginBottom: 30,
+    gap: 8,
+  },
+  progressDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 16,
+  },
+  button: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  resetButton: {
+    backgroundColor: "#6b7280",
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
